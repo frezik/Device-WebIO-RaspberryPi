@@ -40,7 +40,7 @@ has pin_desc => (
 );
 
 
-HiPi::Wiring::wiringPiSetup()
+my $CALLED_WIRING_SETUP = 0;
 
 
 sub BUILDARGS
@@ -55,23 +55,26 @@ sub BUILDARGS
         $args->{input_pin_count}  = 8;
         $args->{output_pin_count} = 8;
         $args->{pwm_pin_count}    = 0;
-        $args->{pin_desc}         = $self->_pin_desc_rev1;
+        $args->{pin_desc}         = $class->_pin_desc_rev1;
     }
     elsif( TYPE_REV2 == $rpi_type ) {
         $args->{input_pin_count}  = 8;
         $args->{output_pin_count} = 8;
         $args->{pwm_pin_count}    = 1;
-        $args->{pin_desc}         = $self->_pin_desc_rev2;
+        $args->{pin_desc}         = $class->_pin_desc_rev2;
     }
     elsif( TYPE_MODEL_B_PLUS == $rpi_type ) {
         $args->{input_pin_count}  = 17;
         $args->{output_pin_count} = 17;
         $args->{pwm_pin_count}    = 1;
-        $args->{pin_desc}         = $self->_pin_desc_model_b_plus,
+        $args->{pin_desc}         = $class->_pin_desc_model_b_plus,
     }
     else {
         die "Don't know what to do with Rpi type '$rpi_type'\n";
     }
+
+    HiPi::Wiring::wiringPiSetup() unless $CALLED_WIRING_SETUP;
+    $CALLED_WIRING_SETUP = 1;
 
     return $args;
 }
@@ -122,9 +125,9 @@ with 'Device::WebIO::Device::PWM';
     my %did_set_pwm;
     sub pwm_output_int
     {
-        my ($self, $pin, $val) = @_:
+        my ($self, $pin, $val) = @_;
         HiPi::Wiring::pinMode( $pin, WPI_PWM_OUTPUT )
-            if ! exists $did_set_pwm_$pin};
+            if ! exists $did_set_pwm{$pin};
         $did_set_pwm{$pin} = 1;
 
         HiPi::Wiring::pwmWrite( $pin, $val );
@@ -135,7 +138,6 @@ with 'Device::WebIO::Device::PWM';
 
 sub _pin_desc_rev1
 {
-    my ($self) = @_;
     return [qw{
         V33 V50 2 V50 3 GND 4 14 GND 15 17 18 27 GND 22 23 V33 24 10 GND 9 25
         11 8 GND 7
@@ -144,7 +146,6 @@ sub _pin_desc_rev1
 
 sub _pin_desc_rev2
 {
-    my ($self) = @_;
     return [qw{
         V33 V50 2 V50 3 GND 4 14 GND 15 17 18 27 GND 22 23 V33 24 10 GND 9 25
         11 8 GND 7
@@ -153,7 +154,6 @@ sub _pin_desc_rev2
 
 sub _pin_desc_model_b_plus
 {
-    my ($self) = @_;
     return [qw{
         V33 V50 2 V50 3 GND 4 14 GND 15 17 18 27 GND 22 23 V33 24 10 GND 9 25
         11 8 GND 7 GND GND 5 GND 6 12 13 GND 19 16 26 20 GND 21
