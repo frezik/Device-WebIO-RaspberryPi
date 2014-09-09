@@ -35,7 +35,9 @@ use constant {
     TYPE_MODEL_B_PLUS => 2,
 };
 
-has pin_desc => (
+has 'pin_desc', is => 'ro';
+has '_type',    is => 'ro';
+has '_pin_mode' => (
     is => 'ro',
 );
 
@@ -73,6 +75,9 @@ sub BUILDARGS
         die "Don't know what to do with Rpi type '$rpi_type'\n";
     }
 
+    $args->{'_pin_mode'}         = [ ('IN') x $args->{input_pin_count}  ];
+    $args->{'_output_pin_value'} = [ (0)    x $args->{output_pin_count} ];
+
     HiPi::Wiring::wiringPiSetup() unless $CALLED_WIRING_SETUP;
     $CALLED_WIRING_SETUP = 1;
 
@@ -86,6 +91,7 @@ with 'Device::WebIO::Device::DigitalInput';
 sub set_as_input
 {
     my ($self, $pin) = @_;
+    $self->{'_pin_mode'}[$pin] = 'IN';
     HiPi::Wiring::pinMode( $pin, WPI_INPUT );
     return 1;
 }
@@ -104,6 +110,7 @@ with 'Device::WebIO::Device::DigitalOutput';
 sub set_as_output
 {
     my ($self, $pin) = @_;
+    $self->{'_pin_mode'}[$pin] = 'OUT';
     HiPi::Wiring::pinMode( $pin, WPI_OUTPUT );
     return 1;
 }
@@ -111,6 +118,7 @@ sub set_as_output
 sub output_pin
 {
     my ($self, $pin, $value) = @_;
+    $self->{'_output_pin_value'}[$pin] = $value;
     HiPi::Wiring::digitalWrite( $pin, $value ? WPI_LOW : WPI_HIGH );
     return 1;
 }
@@ -158,6 +166,32 @@ sub _pin_desc_model_b_plus
         V33 V50 2 V50 3 GND 4 14 GND 15 17 18 27 GND 22 23 V33 24 10 GND 9 25
         11 8 GND 7 GND GND 5 GND 6 12 13 GND 19 16 26 20 GND 21
     }];
+}
+
+
+sub all_desc
+{
+    my ($self) = @_;
+    my $pin_count = $self->input_pin_count;
+
+    my %data = (
+        UART    => 0,
+        SPI     => 0,
+        I2C     => 0,
+        ONEWIRE => 0,
+        GPIO => {
+            map {
+                my $function = $self->{'_pin_mode'}[$_];
+                my $value = $function eq 'IN'
+                    ? $self->input_pin( $_ ) 
+                    : $self->{'_output_pin_value'}[$_];
+                $_ => {
+                    function => 'IN',
+                    value    => $value,
+                };
+            } 0 .. ($pin_count - 1)
+        },
+    );
 }
 
 
