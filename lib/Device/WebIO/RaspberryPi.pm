@@ -48,7 +48,7 @@ my $CALLED_WIRING_SETUP = 0;
 sub BUILDARGS
 {
     my ($class, $args) = @_;
-    my $rpi_type = delete($args->{type}) // $class->TYPE_ORIG;
+    my $rpi_type = delete($args->{type}) // $class->TYPE_REV1;
 
     $args->{pwm_bit_resolution} = 10;
     $args->{pwm_max_int}        = 2 ** $args->{pwm_bit_resolution};
@@ -119,7 +119,7 @@ sub output_pin
 {
     my ($self, $pin, $value) = @_;
     $self->{'_output_pin_value'}[$pin] = $value;
-    HiPi::Wiring::digitalWrite( $pin, $value ? WPI_LOW : WPI_HIGH );
+    HiPi::Wiring::digitalWrite( $pin, $value ? WPI_HIGH : WPI_LOW );
     return 1;
 }
 

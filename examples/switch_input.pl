@@ -5,8 +5,8 @@ use Device::WebIO::RaspberryPi;
 use Time::HiRes 'sleep';
 
 use constant SLEEP_MS   => 0.1;
-use constant INPUT_PIN  => 0;
-use constant OUTPUT_PIN => 1;
+use constant INPUT_PIN  => 1;
+use constant OUTPUT_PIN => 0;
 
 
 my $rpi = Device::WebIO::RaspberryPi->new;
@@ -14,9 +14,13 @@ my $rpi = Device::WebIO::RaspberryPi->new;
 my $webio = Device::WebIO->new;
 $webio->register( 'rpi', $rpi );
 
+$webio->set_as_input(  'rpi', INPUT_PIN );
+$webio->set_as_output( 'rpi', OUTPUT_PIN );
 
+say "Taking input . . . ";
 while(1) {
     my $in = $webio->digital_input( 'rpi', INPUT_PIN );
+    say "Switch on" if $in;
     $webio->digital_output( 'rpi', OUTPUT_PIN, $in );
     sleep SLEEP_MS;
 }
