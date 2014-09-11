@@ -5,8 +5,8 @@ use Device::WebIO::RaspberryPi;
 use Time::HiRes 'sleep';
 
 use constant SLEEP_MS   => 0.1;
-use constant INPUT_PIN  => 1;
-use constant OUTPUT_PIN => 0;
+use constant INPUT_PIN  => 18;
+use constant OUTPUT_PIN => 17;
 
 
 my $rpi = Device::WebIO::RaspberryPi->new;

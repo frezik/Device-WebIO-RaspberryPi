@@ -35,9 +35,81 @@ use constant {
     TYPE_MODEL_B_PLUS => 2,
 };
 
+use constant {
+    # maps of Rpi Pin -> Wiring lib pin
+    PIN_MAP_REV1 => {
+        0  => 8,
+        1  => 9,
+        4  => 7,
+        7  => 11,
+        8  => 10,
+        9  => 13,
+        10 => 12,
+        11 => 14,
+        14 => 15,
+        15 => 16,
+        17 => 0,
+        18 => 1,
+        21 => 2,
+        22 => 3,
+        23 => 4,
+        24 => 5,
+        25 => 6,
+    },
+    PIN_MAP_REV2 => {
+        2  => 8,
+        3  => 9,
+        4  => 7,
+        7  => 11,
+        8  => 10,
+        9  => 13,
+        10 => 12,
+        11 => 14,
+        14 => 15,
+        15 => 16,
+        17 => 0,
+        18 => 1,
+        27 => 2,
+        28 => 17,
+        22 => 3,
+        23 => 4,
+        24 => 5,
+        25 => 6,
+        30 => 19,
+        29 => 18,
+        31 => 20,
+    },
+    PIN_MAP_MODEL_B_PLUS => {
+        2  => 8,
+        3  => 9,
+        4  => 7,
+        7  => 11,
+        8  => 10,
+        9  => 13,
+        10 => 12,
+        11 => 14,
+        14 => 15,
+        15 => 16,
+        17 => 0,
+        18 => 1,
+        27 => 2,
+        28 => 17,
+        22 => 3,
+        23 => 4,
+        24 => 5,
+        25 => 6,
+        30 => 19,
+        29 => 18,
+        31 => 20,
+    },
+};
+
 has 'pin_desc', is => 'ro';
 has '_type',    is => 'ro';
 has '_pin_mode' => (
+    is => 'ro',
+);
+has '_pin_map' => (
     is => 'ro',
 );
 
@@ -54,22 +126,25 @@ sub BUILDARGS
     $args->{pwm_max_int}        = 2 ** $args->{pwm_bit_resolution};
 
     if( TYPE_REV1 == $rpi_type ) {
-        $args->{input_pin_count}  = 8;
-        $args->{output_pin_count} = 8;
+        $args->{input_pin_count}  = 26;
+        $args->{output_pin_count} = 26;
         $args->{pwm_pin_count}    = 0;
         $args->{pin_desc}         = $class->_pin_desc_rev1;
+        $args->{'_pin_map'}       = $class->PIN_MAP_REV1;
     }
     elsif( TYPE_REV2 == $rpi_type ) {
-        $args->{input_pin_count}  = 8;
-        $args->{output_pin_count} = 8;
+        $args->{input_pin_count}  = 26;
+        $args->{output_pin_count} = 26;
         $args->{pwm_pin_count}    = 1;
         $args->{pin_desc}         = $class->_pin_desc_rev2;
+        $args->{'_pin_map'}       = $class->PIN_MAP_REV2;
     }
     elsif( TYPE_MODEL_B_PLUS == $rpi_type ) {
-        $args->{input_pin_count}  = 17;
-        $args->{output_pin_count} = 17;
+        $args->{input_pin_count}  = 26;
+        $args->{output_pin_count} = 26;
         $args->{pwm_pin_count}    = 1;
-        $args->{pin_desc}         = $class->_pin_desc_model_b_plus,
+        $args->{pin_desc}         = $class->_pin_desc_model_b_plus;
+        $args->{'_pin_map'}       = $class->PIN_MAP_MODEL_B_PLUS;
     }
     else {
         die "Don't know what to do with Rpi type '$rpi_type'\n";
@@ -90,7 +165,8 @@ with 'Device::WebIO::Device::DigitalInput';
 
 sub set_as_input
 {
-    my ($self, $pin) = @_;
+    my ($self, $rpi_pin) = @_;
+    my $pin = $self->_pin_map->{$rpi_pin};
     $self->{'_pin_mode'}[$pin] = 'IN';
     HiPi::Wiring::pinMode( $pin, WPI_INPUT );
     return 1;
@@ -98,7 +174,8 @@ sub set_as_input
 
 sub input_pin
 {
-    my ($self, $pin) = @_;
+    my ($self, $rpi_pin) = @_;
+    my $pin = $self->_pin_map->{$rpi_pin};
     my $in = HiPi::Wiring::digitalRead( $pin );
     return $in;
 }
@@ -109,7 +186,8 @@ with 'Device::WebIO::Device::DigitalOutput';
 
 sub set_as_output
 {
-    my ($self, $pin) = @_;
+    my ($self, $rpi_pin) = @_;
+    my $pin = $self->_pin_map->{$rpi_pin};
     $self->{'_pin_mode'}[$pin] = 'OUT';
     HiPi::Wiring::pinMode( $pin, WPI_OUTPUT );
     return 1;
@@ -117,7 +195,8 @@ sub set_as_output
 
 sub output_pin
 {
-    my ($self, $pin, $value) = @_;
+    my ($self, $rpi_pin, $value) = @_;
+    my $pin = $self->_pin_map->{$rpi_pin};
     $self->{'_output_pin_value'}[$pin] = $value;
     HiPi::Wiring::digitalWrite( $pin, $value ? WPI_HIGH : WPI_LOW );
     return 1;
@@ -133,7 +212,8 @@ with 'Device::WebIO::Device::PWM';
     my %did_set_pwm;
     sub pwm_output_int
     {
-        my ($self, $pin, $val) = @_;
+        my ($self, $rpi_pin, $val) = @_;
+        my $pin = $self->_pin_map->{$rpi_pin};
         HiPi::Wiring::pinMode( $pin, WPI_PWM_OUTPUT )
             if ! exists $did_set_pwm{$pin};
         $did_set_pwm{$pin} = 1;
