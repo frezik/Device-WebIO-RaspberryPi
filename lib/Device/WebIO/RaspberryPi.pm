@@ -266,7 +266,7 @@ sub all_desc
                     ? $self->input_pin( $_ ) 
                     : $self->{'_output_pin_value'}[$_];
                 $_ => {
-                    function => 'IN',
+                    function => $function,
                     value    => $value,
                 };
             } 0 .. ($pin_count - 1)
