@@ -166,7 +166,8 @@ with 'Device::WebIO::Device::DigitalInput';
 sub set_as_input
 {
     my ($self, $rpi_pin) = @_;
-    my $pin = $self->_pin_map->{$rpi_pin};
+    my $pin = $self->_rpi_pin_to_wiring( $rpi_pin );
+    return undef if $pin < 0;
     $self->{'_pin_mode'}[$pin] = 'IN';
     HiPi::Wiring::pinMode( $pin, WPI_INPUT );
     return 1;
@@ -175,7 +176,8 @@ sub set_as_input
 sub input_pin
 {
     my ($self, $rpi_pin) = @_;
-    my $pin = $self->_pin_map->{$rpi_pin};
+    my $pin = $self->_rpi_pin_to_wiring( $rpi_pin );
+    return undef if $pin < 0;
     my $in = HiPi::Wiring::digitalRead( $pin );
     return $in;
 }
@@ -187,7 +189,8 @@ with 'Device::WebIO::Device::DigitalOutput';
 sub set_as_output
 {
     my ($self, $rpi_pin) = @_;
-    my $pin = $self->_pin_map->{$rpi_pin};
+    my $pin = $self->_rpi_pin_to_wiring( $rpi_pin );
+    return undef if $pin < 0;
     $self->{'_pin_mode'}[$pin] = 'OUT';
     HiPi::Wiring::pinMode( $pin, WPI_OUTPUT );
     return 1;
@@ -196,7 +199,8 @@ sub set_as_output
 sub output_pin
 {
     my ($self, $rpi_pin, $value) = @_;
-    my $pin = $self->_pin_map->{$rpi_pin};
+    my $pin = $self->_rpi_pin_to_wiring( $rpi_pin );
+    return undef if $pin < 0;
     $self->{'_output_pin_value'}[$pin] = $value;
     HiPi::Wiring::digitalWrite( $pin, $value ? WPI_HIGH : WPI_LOW );
     return 1;
@@ -213,7 +217,8 @@ with 'Device::WebIO::Device::PWM';
     sub pwm_output_int
     {
         my ($self, $rpi_pin, $val) = @_;
-        my $pin = $self->_pin_map->{$rpi_pin};
+        my $pin = $self->_rpi_pin_to_wiring( $rpi_pin );
+        return undef if $pin < 0;
         HiPi::Wiring::pinMode( $pin, WPI_PWM_OUTPUT )
             if ! exists $did_set_pwm{$pin};
         $did_set_pwm{$pin} = 1;
@@ -249,6 +254,14 @@ sub _pin_desc_model_b_plus
 }
 
 
+sub _rpi_pin_to_wiring
+{
+    my ($self, $rpi_pin) = @_;
+    my $pin = $self->_pin_map->{$rpi_pin} // -1;
+    return $pin;
+}
+
+
 sub all_desc
 {
     my ($self) = @_;
@@ -265,13 +278,19 @@ sub all_desc
                 my $value = $function eq 'IN'
                     ? $self->input_pin( $_ ) 
                     : $self->{'_output_pin_value'}[$_];
-                $_ => {
-                    function => $function,
-                    value    => $value,
-                };
+                (defined $value)
+                    ? (
+                        $_ => {
+                            function => $function,
+                            value    => $value,
+                        }
+                    )
+                    : ();
             } 0 .. ($pin_count - 1)
         },
     );
+
+    return \%data;
 }
 
 
