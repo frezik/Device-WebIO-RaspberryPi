@@ -182,6 +182,15 @@ sub input_pin
     return $in;
 }
 
+sub is_set_input
+{
+    my ($self, $rpi_pin) = @_;
+    my $pin = $self->_rpi_pin_to_wiring( $rpi_pin );
+    return undef if $pin < 0;
+    return 1 if $self->_pin_mode == 'IN';
+    return 0;
+}
+
 
 has 'output_pin_count', is => 'ro';
 with 'Device::WebIO::Device::DigitalOutput';
@@ -204,6 +213,15 @@ sub output_pin
     $self->{'_output_pin_value'}[$pin] = $value;
     HiPi::Wiring::digitalWrite( $pin, $value ? WPI_HIGH : WPI_LOW );
     return 1;
+}
+
+sub is_set_output
+{
+    my ($self, $rpi_pin) = @_;
+    my $pin = $self->_rpi_pin_to_wiring( $rpi_pin );
+    return undef if $pin < 0;
+    return 1 if $self->_pin_mode == 'OUT';
+    return 0;
 }
 
 
