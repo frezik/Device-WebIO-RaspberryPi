@@ -187,7 +187,7 @@ sub is_set_input
     my ($self, $rpi_pin) = @_;
     my $pin = $self->_rpi_pin_to_wiring( $rpi_pin );
     return undef if $pin < 0;
-    return 1 if $self->_pin_mode == 'IN';
+    return 1 if $self->_pin_mode eq 'IN';
     return 0;
 }
 
@@ -220,7 +220,7 @@ sub is_set_output
     my ($self, $rpi_pin) = @_;
     my $pin = $self->_rpi_pin_to_wiring( $rpi_pin );
     return undef if $pin < 0;
-    return 1 if $self->_pin_mode == 'OUT';
+    return 1 if $self->_pin_mode eq 'OUT';
     return 0;
 }
 
