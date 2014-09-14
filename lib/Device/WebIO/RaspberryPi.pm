@@ -112,6 +112,8 @@ has '_pin_mode' => (
 has '_pin_map' => (
     is => 'ro',
 );
+# Note that _output_pin_value should be mapped by the Wiring library's 
+# pin number, *not* the Rpi's numbering
 has '_output_pin_value' => (
     is => 'ro',
 );
@@ -213,7 +215,7 @@ sub output_pin
     my ($self, $rpi_pin, $value) = @_;
     my $pin = $self->_rpi_pin_to_wiring( $rpi_pin );
     return undef if $pin < 0;
-    $self->_output_pin_value->[$pin] = $value;
+    $self->_output_pin_value->[$rpi_pin] = $value;
     HiPi::Wiring::digitalWrite( $pin, $value ? WPI_HIGH : WPI_LOW );
     return 1;
 }
