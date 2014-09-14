@@ -112,6 +112,9 @@ has '_pin_mode' => (
 has '_pin_map' => (
     is => 'ro',
 );
+has '_output_pin_value' => (
+    is => 'ro',
+);
 
 
 my $CALLED_WIRING_SETUP = 0;
@@ -187,7 +190,7 @@ sub is_set_input
     my ($self, $rpi_pin) = @_;
     my $pin = $self->_rpi_pin_to_wiring( $rpi_pin );
     return undef if $pin < 0;
-    return 1 if $self->_pin_mode eq 'IN';
+    return 1 if $self->_pin_mode->[$pin] eq 'IN';
     return 0;
 }
 
@@ -210,7 +213,7 @@ sub output_pin
     my ($self, $rpi_pin, $value) = @_;
     my $pin = $self->_rpi_pin_to_wiring( $rpi_pin );
     return undef if $pin < 0;
-    $self->{'_output_pin_value'}[$pin] = $value;
+    $self->_output_pin_value->[$pin] = $value;
     HiPi::Wiring::digitalWrite( $pin, $value ? WPI_HIGH : WPI_LOW );
     return 1;
 }
@@ -220,7 +223,7 @@ sub is_set_output
     my ($self, $rpi_pin) = @_;
     my $pin = $self->_rpi_pin_to_wiring( $rpi_pin );
     return undef if $pin < 0;
-    return 1 if $self->_pin_mode eq 'OUT';
+    return 1 if $self->_pin_mode->[$pin] eq 'OUT';
     return 0;
 }
 
@@ -292,10 +295,12 @@ sub all_desc
         ONEWIRE => 0,
         GPIO => {
             map {
-                my $function = $self->{'_pin_mode'}[$_];
+                my $function = $self->is_set_input( $_ ) ? 'IN'
+                    : $self->is_set_output( $_ )         ? 'OUT'
+                    : 'UNSET';
                 my $value = $function eq 'IN'
                     ? $self->input_pin( $_ ) 
-                    : $self->{'_output_pin_value'}[$_];
+                    : $self->_output_pin_value->[$_];
                 (defined $value)
                     ? (
                         $_ => {
