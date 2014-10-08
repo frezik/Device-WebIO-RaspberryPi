@@ -478,6 +478,8 @@ WebIO object.
 
 =item * StillImageOutput
 
+=item * I2CProvider
+
 =back
 
 =head1 LICENSE
