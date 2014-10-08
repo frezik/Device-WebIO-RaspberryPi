@@ -28,7 +28,7 @@ use v5.12;
 use Moo;
 use namespace::clean;
 use HiPi::Wiring qw( :wiring );
-use HiPI::Device::I2C;
+use HiPi::Device::I2C;
 
 use constant {
     TYPE_REV1         => 0,
@@ -338,8 +338,8 @@ sub i2c_read
         address    => $addr,
     );
 
-    my (@data) = $hipi->bus_read( $register, $len );
-    return @bytes;
+    my @data = $hipi->bus_read( $register, $len );
+    return @data;
 }
 
 sub i2c_write
