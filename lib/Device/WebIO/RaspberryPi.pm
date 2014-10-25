@@ -264,6 +264,12 @@ has '_img_height' => (
         768
     ]},
 );
+has '_img_quality' => (
+    is      => 'rw',
+    default => sub {[
+        100
+    ]},
+);
 with 'Device::WebIO::Device::StillImageOutput';
 
 my %IMG_CONTENT_TYPES = (
@@ -284,6 +290,12 @@ sub img_height
     return $self->_img_height->[$channel];
 }
 
+sub img_quality
+{
+    my ($self, $channel) = @_;
+    return $self->_img_quality->[$channel];
+}
+
 sub img_set_width
 {
     my ($self, $channel, $width) = @_;
@@ -295,6 +307,13 @@ sub img_set_height
 {
     my ($self, $channel, $height) = @_;
     $self->_img_height->[$channel] = $height;
+    return 1;
+}
+
+sub img_set_quality
+{
+    my ($self, $channel, $quality) = @_;
+    $self->_img_quality->[$channel] = $quality;
     return 1;
 }
 
