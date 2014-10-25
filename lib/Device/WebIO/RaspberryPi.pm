@@ -334,11 +334,12 @@ sub img_stream
     my ($self, $channel, $mime_type) = @_;
     my $imager_type = $IMG_CONTENT_TYPES{$mime_type};
 
-    my $width  = $self->img_width( $channel );
-    my $height = $self->img_height( $channel );
+    my $width   = $self->img_width( $channel );
+    my $height  = $self->img_height( $channel );
+    my $quality = $self->img_quality( $channel );
 
     # TODO Capture using a more direct way than executing raspistill
-    open( my $in, '-|', "raspistill -o - -w $width -h $height" ) 
+    open( my $in, '-|', "raspistill -o - -w $width -h $height -q $quality" ) 
         or die "Couldn't execute raspistill: $!\n";
     return $in;
 }
