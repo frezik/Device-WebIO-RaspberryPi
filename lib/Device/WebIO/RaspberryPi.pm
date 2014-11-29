@@ -436,6 +436,164 @@ sub _get_i2c_device_by_channel
 }
 
 
+has '_vid_width' => (
+    is      => 'rw',
+    default => sub {[
+        1920
+    ]},
+);
+has '_vid_height' => (
+    is      => 'rw',
+    default => sub {[
+       1080 
+    ]},
+);
+has '_vid_fps' => (
+    is      => 'rw',
+    default => sub {[
+       30
+    ]},
+);
+has '_vid_bitrate' => (
+    is      => 'rw',
+    default => sub {[
+       8000
+    ]},
+);
+has '_vid_stream_callbacks' => (
+    is      => 'rw',
+    default => sub {[]},
+);
+with 'Device::WebIO::Device::VideoOutputCallback';
+
+sub vid_channels
+{
+    return 1;
+}
+
+sub vid_height
+{
+    my ($self, $pin) = @_;
+    return $self->_vid_height->[$pin];
+}
+
+sub vid_width
+{
+    my ($self, $pin) = @_;
+    return $self->_vid_width->[$pin];
+}
+
+sub vid_fps
+{
+    my ($self, $pin) = @_;
+    return $self->_vid_fps->[$pin];
+}
+
+sub vid_kbps
+{
+    my ($self, $pin) = @_;
+    return $self->_vid_bitrate->[$pin];
+}
+
+sub vid_set_width
+{
+    my ($self, $pin, $val) = @_;
+    return $self->_vid_width->[$pin] = $val;
+}
+
+sub vid_set_height
+{
+    my ($self, $pin, $val) = @_;
+    return $self->_vid_height->[$pin] = $val;
+}
+
+sub vid_set_fps
+{
+    my ($self, $pin, $val) = @_;
+    return $self->_vid_fps->[$pin] = $val;
+}
+
+sub vid_set_kbps
+{
+    my ($self, $pin, $val) = @_;
+    $val *= 1024;
+    return $self->_vid_bitrate->[$pin] = $val;
+}
+
+sub vid_allowed_content_types
+{
+    return ( 'video/H264' );
+}
+
+sub vid_stream
+{
+    my ($self, $pin, $type) = @_;
+    $self->_init_gstreamer;
+    return 1;
+}
+
+sub vid_stream_callback
+{
+    my ($self, $pin, $type, $callback) = @_;
+    $self->_vid_stream_callbacks->[$pin] = $callback;
+    return 1;
+}
+
+sub vid_stream_begin_loop
+{
+    my ($self, $channel) = @_;
+    my $width   = $self->vid_width( $channel );
+    my $height  = $self->vid_height( $channel );
+    my $fps     = $self->vid_fps( $channel );
+    my $bitrate = $self->vid_kbps( $channel );
+
+
+    $self->_init_gstreamer;
+    my $loop = Glib::MainLoop->new( undef, FALSE );
+    my $pipeline = GStreamer1::Pipeline->new( 'pipeline' );
+
+    my $rpi        = GStreamer1::ElementFactory::make( rpicamsrc => 'and_who' );
+    my $h264parse  = GStreamer1::ElementFactory::make( h264parse => 'are_you' );
+    my $capsfilter = GStreamer1::ElementFactory::make(
+        capsfilter => 'the_proud_lord_said' );
+    my $appsink    = GStreamer1::ElementFactory::make(
+        appsink => 'that_i_should_bow_so_low' );
+
+    $rpi->set( bitrate => $bitrate );
+
+    my $caps = GStreamer1::Caps::Simple->new( 'video/x-h264',
+        width  => 'Glib::Int' => $width,
+        height => 'Glib::Int' => $height,
+        fps    => 'Glib::Int' => $fps,
+    );
+    $capsfilter->set( caps => $caps );
+
+    $appsink->set( 'max-buffers'  => 20 );
+    $appsink->set( 'emit-signals' => TRUE );
+    $appsink->set( 'sync'         => FALSE );
+
+    my @link = ( $rpi, $h264parse, $capsfilter, $appsink );
+    $pipeline->add( $_ ) for @link;
+    foreach my $i (0 .. ($#link - 1)) {
+        my $this = $link[$i];
+        my $next = $link[$i+1];
+        $this->link( $next );
+    }
+
+    $pipeline->set_state( "playing" );
+    # TODO true event-driven loop so we can process other things
+    while( my $sample = $appsink->pull_sample ) {
+        my $frame_buf = $sample->get_buffer;
+        my $size = $frame_buf->get_size;
+        my $buf  = $frame_buf->extract_dup( 0, $size, undef, $size );
+        $self->_vid_stream_callbacks->[$channel]->( $buf );
+    }
+
+    $pipeline->set_state( "null" );
+    return 1;
+}
+
+
 sub _pin_desc_rev1
 {
     return [qw{
@@ -513,11 +671,11 @@ sub _init_gstreamer
 }
 
 
+
 # TODO
 #with 'Device::WebIO::Device::SPI';
 #with 'Device::WebIO::Device::I2C';
 #with 'Device::WebIO::Device::Serial';
-#with 'Device::WebIO::Device::VideoStream';
 
 1;
 __END__
