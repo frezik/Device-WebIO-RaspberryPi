@@ -31,6 +31,7 @@ use HiPi::Wiring qw( :wiring );
 use HiPi::Device::I2C;
 use GStreamer1;
 use Glib qw( TRUE FALSE );
+use AnyEvent;
 
 use constant {
     TYPE_REV1         => 0,
@@ -464,6 +465,10 @@ has '_vid_stream_callbacks' => (
     is      => 'rw',
     default => sub {[]},
 );
+has 'cv' => (
+    is      => 'rw',
+    default => sub { AnyEvent->condvar },
+);
 with 'Device::WebIO::Device::VideoOutputCallback';
 
 sub vid_channels
@@ -542,22 +547,23 @@ sub vid_stream_callback
 sub vid_stream_begin_loop
 {
     my ($self, $channel) = @_;
-    my $width   = $self->vid_width( $channel );
-    my $height  = $self->vid_height( $channel );
-    my $fps     = $self->vid_fps( $channel );
-    my $bitrate = $self->vid_kbps( $channel );
+    my $width    = $self->vid_width( $channel );
+    my $height   = $self->vid_height( $channel );
+    my $fps      = $self->vid_fps( $channel );
+    my $bitrate  = $self->vid_kbps( $channel );
+    my $callback = $self->_vid_stream_callbacks->[$channel];
 
 
     $self->_init_gstreamer;
-    my $loop = Glib::MainLoop->new( undef, FALSE );
+    my $cv = $self->cv;
     my $pipeline = GStreamer1::Pipeline->new( 'pipeline' );
 
     my $rpi        = GStreamer1::ElementFactory::make( rpicamsrc => 'and_who' );
     my $h264parse  = GStreamer1::ElementFactory::make( h264parse => 'are_you' );
     my $capsfilter = GStreamer1::ElementFactory::make(
         capsfilter => 'the_proud_lord_said' );
-    my $appsink    = GStreamer1::ElementFactory::make(
-        appsink => 'that_i_should_bow_so_low' );
+    my $sink    = GStreamer1::ElementFactory::make(
+        fakesink => 'that_i_should_bow_so_low' );
 
     $rpi->set( bitrate => $bitrate );
 
@@ -568,11 +574,12 @@ sub vid_stream_begin_loop
     );
     $capsfilter->set( caps => $caps );
 
-    $appsink->set( 'max-buffers'  => 20 );
-    $appsink->set( 'emit-signals' => TRUE );
-    $appsink->set( 'sync'         => FALSE );
+    $sink->set( 'signal-handoffs' => TRUE );
+    $sink->signal_connect(
+        'handoff' => $self->_get_vid_stream_callback( $pipeline, $cv, $callback )
+    );
 
-    my @link = ( $rpi, $h264parse, $capsfilter, $appsink );
+    my @link = ( $rpi, $h264parse, $capsfilter, $sink );
     $pipeline->add( $_ ) for @link;
     foreach my $i (0 .. ($#link - 1)) {
         my $this = $link[$i];
@@ -581,18 +588,29 @@ sub vid_stream_begin_loop
     }
 
     $pipeline->set_state( "playing" );
-    # TODO true event-driven loop so we can process other things
-    while( my $sample = $appsink->pull_sample ) {
-        my $frame_buf = $sample->get_buffer;
-        my $size = $frame_buf->get_size;
-        my $buf  = $frame_buf->extract_dup( 0, $size, undef, $size );
-        $self->_vid_stream_callbacks->[$channel]->( $buf );
-    }
-
+    $cv->recv;
     $pipeline->set_state( "null" );
+
     return 1;
 }
 
+
+sub _get_vid_stream_callback
+{
+    my ($self, $pipeline, $cv, $callback) = @_;
+
+    my $full_callback = sub {
+        my ($sink, $data_buf, $pad) = @_;
+        my $size = $data_buf->get_size;
+        my $buf  = $data_buf->extract_dup( 0, $size, undef, $size );
+
+        $callback->( $buf );
+
+        return 1;
+    };
+
+    return $full_callback;
+}
 
 sub _pin_desc_rev1
 {
@@ -727,7 +745,18 @@ https://github.com/thaytan/gst-rpicamsrc
 
 =item * I2CProvider
 
+=item * VideoOutputCallback
+
 =back
+
+=head1 ADDITONAL METHODS
+
+=head2 cv
+
+Returns the condvar from C<AnyEvent>, which is used for video processing.  If 
+there's any events you would like to handle in between video frames, get this 
+condvar and use it with C<AnyEvent>. You may also use this method as a 
+setter before calling C<vid_stream_begin_loop()>.
 
 =head1 LICENSE
 
