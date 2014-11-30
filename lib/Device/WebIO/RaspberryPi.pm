@@ -108,6 +108,22 @@ use constant {
     },
 };
 
+my %ALLOWED_VIDEO_TYPES = (
+    'video/H264'      => 1,
+    'video/x-msvideo' => 1,
+
+    # mp4mux doesn't seem to like the stream-format that comes out of rpicamsrc.
+    # Converting might be too slow on the Rpi.  For reference, try to get this 
+    # pipeline to work (which won't link up as written):
+    #
+    # gst-launch-1.0 -v rpicamsrc ! h264parse ! \
+    #     'video/x-h264,width=800,height=600,fps=30,stream-format=avc' ! \
+    #     mp4mux ! filesink location=/tmp/output.mp4
+    #
+#    'video/mp4'       => 1,
+);
+
+
 has 'pin_desc', is => 'ro';
 has '_type',    is => 'ro';
 has '_pin_mode' => (
@@ -465,6 +481,10 @@ has '_vid_stream_callbacks' => (
     is      => 'rw',
     default => sub {[]},
 );
+has '_vid_stream_callback_types' => (
+    is      => 'rw',
+    default => sub {[]},
+);
 has 'cv' => (
     is      => 'rw',
     default => sub { AnyEvent->condvar },
@@ -527,12 +547,13 @@ sub vid_set_kbps
 
 sub vid_allowed_content_types
 {
-    return ( 'video/H264' );
+    return keys %ALLOWED_VIDEO_TYPES;
 }
 
 sub vid_stream
 {
     my ($self, $pin, $type) = @_;
+    die "Do not support type '$type'" unless exists $ALLOWED_VIDEO_TYPES{$type};
     $self->_init_gstreamer;
     return 1;
 }
@@ -540,7 +561,9 @@ sub vid_stream
 sub vid_stream_callback
 {
     my ($self, $pin, $type, $callback) = @_;
+    die "Do not support type '$type'" unless exists $ALLOWED_VIDEO_TYPES{$type};
     $self->_vid_stream_callbacks->[$pin] = $callback;
+    $self->_vid_stream_callback_types->[$pin] = $type;
     return 1;
 }
 
@@ -552,6 +575,7 @@ sub vid_stream_begin_loop
     my $fps      = $self->vid_fps( $channel );
     my $bitrate  = $self->vid_kbps( $channel );
     my $callback = $self->_vid_stream_callbacks->[$channel];
+    my $type     = $self->_vid_stream_callback_types->[$channel];
 
 
     $self->_init_gstreamer;
@@ -564,6 +588,10 @@ sub vid_stream_begin_loop
         capsfilter => 'the_proud_lord_said' );
     my $sink    = GStreamer1::ElementFactory::make(
         fakesink => 'that_i_should_bow_so_low' );
+
+    my $muxer = ($type ne 'video/H264')
+        ? $self->_get_vid_mux_by_type( $type )
+        : undef;
 
     $rpi->set( bitrate => $bitrate );
 
@@ -579,7 +607,9 @@ sub vid_stream_begin_loop
         'handoff' => $self->_get_vid_stream_callback( $pipeline, $cv, $callback )
     );
 
-    my @link = ( $rpi, $h264parse, $capsfilter, $sink );
+    my @link = ( $rpi, $h264parse, $capsfilter );
+    push @link, $muxer if defined $muxer;
+    push @link, $sink;
     $pipeline->add( $_ ) for @link;
     foreach my $i (0 .. ($#link - 1)) {
         my $this = $link[$i];
@@ -610,6 +640,29 @@ sub _get_vid_stream_callback
     };
 
     return $full_callback;
+}
+
+my %MUXER_BY_TYPE = (
+    'video/x-msvideo' => [
+        'avimux', {},
+    ],
+#    'video/mp4'       => [
+#        'mp4mux', {
+#            streamable => TRUE,
+#        },
+#    ],
+);
+sub _get_vid_mux_by_type
+{
+    my ($self, $type) = @_;
+    my ($muxer_name, $properties) = @{ $MUXER_BY_TYPE{$type} };
+    my $muxer = GStreamer1::ElementFactory::make( $muxer_name => 'muxer' );
+
+    for (keys %$properties) {
+        $muxer->set( $_ => $properties->{$_} );
+    }
+
+    return $muxer;
 }
 
 sub _pin_desc_rev1
