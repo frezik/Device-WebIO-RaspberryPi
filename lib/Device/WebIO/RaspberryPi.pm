@@ -745,7 +745,7 @@ sub _init_gstreamer
 
 with 'Device::WebIO::Device::SPI';
 
-my @CHANNEL_NAME = HiPi::Device::SPI->get_device_list;
+my @CHANNEL_NAMES = sort HiPi::Device::SPI->get_device_list;
 has '_spi_channel_devs' => (
     is      => 'ro',
     default => sub {{}},
@@ -775,8 +775,7 @@ sub spi_write
 {
     my ($self, $channel, $data) = @_;
     my $dev  = $self->_spi_get_dev( $channel );
-    my $out_buf = pack 'C*', @$data;
-    $dev->transfer( $out_buf );
+    $dev->transfer( $data );
     return 1;
 }
 
@@ -802,7 +801,6 @@ sub _spi_get_dev
 
 
 # TODO
-#with 'Device::WebIO::Device::I2C';
 #with 'Device::WebIO::Device::Serial';
 
 1;
