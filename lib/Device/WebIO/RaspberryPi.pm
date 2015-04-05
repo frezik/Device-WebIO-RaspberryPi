@@ -622,18 +622,17 @@ sub vid_stream_begin_loop
         'handoff' => $self->_get_vid_stream_callback( $pipeline, $cv, $callback )
     );
 
-    my @link = ( $rpi, $h264parse, $capsfilter );
-    push @link, $muxer if defined $muxer;
+    $pipeline->add( $muxer ) if defined $muxer;
 
-    if( defined($muxer) && ($type ne 'video/H264') ) {
+    if( $use_audio && defined $muxer ) {
         my $audio_src = GStreamer1::ElementFactory::make(
             'alsasrc' => 'of_a_different_coat' );
         my $audio_caps = GStreamer1::ElementFactory::make(
-            capsfilter => 'the_proud_lord_said' );
+            capsfilter => 'the_only_truth_i_know' );
         my $mp3enc = GStreamer1::ElementFactory::make(
-            lamemp3enc => 'the_only_truth_i_know' );
+            lamemp3enc => 'in_a_coat_of_red' );
         my $audio_queue = GStreamer1::ElementFactory::make(
-            queue => 'in_a_coat_of_gold' );
+            queue => 'or_a_coat_of_gold' );
 
         $audio_src->set( 'device' => $audio_dev );
         $mp3enc->set( 'bitrate' => 256 );
@@ -645,20 +644,19 @@ sub vid_stream_begin_loop
         );
         $audio_caps->set( caps => $caps );
 
-        $audio_src->link(  $audio_caps );  $pipeline->add( $audio_src );
-        $audio_caps->link( $mp3enc );      $pipeline->add( $audio_caps );
-        $mp3enc->link(     $audio_queue ); $pipeline->add( $mp3enc );
-        $audio_queue->link( $muxer ) if defined $muxer;
-        $pipeline->add( $audio_queue );
+        $pipeline->add( $_ ) for $audio_src, $audio_caps, $mp3enc, $audio_queue;
+        $audio_src->link(   $audio_caps  );
+        $audio_caps->link(  $mp3enc      );
+        $mp3enc->link(      $audio_queue );
+        $audio_queue->link( $muxer       );
     }
 
-    push @link, $sink;
-    $pipeline->add( $_ ) for @link;
-    foreach my $i (0 .. ($#link - 1)) {
-        my $this = $link[$i];
-        my $next = $link[$i+1];
-        $this->link( $next );
-    }
+    $pipeline->add( $_ ) for $rpi, $h264parse, $capsfilter, $sink, $vid_queue;
+    $rpi->link( $h264parse );
+    $h264parse->link( $capsfilter );
+    $capsfilter->link( $vid_queue );
+    $vid_queue->link( $muxer );
+    $muxer->link( $sink );
 
     $pipeline->set_state( "playing" );
     $cv->recv;

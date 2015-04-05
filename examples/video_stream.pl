@@ -8,7 +8,7 @@ use Getopt::Long;
 my $WIDTH    = 1024;
 my $HEIGHT   = 768;
 my $BITRATE  = 2000;
-my $TYPE     = 'h264';
+my $TYPE     = 'avi';
 my $OUT_FILE = '';
 Getopt::Long::GetOptions(
     'width=i'   => \$WIDTH,
@@ -29,7 +29,9 @@ die "Type '$TYPE' is not supported\n" if ! exists $TYPE_LOOKUP{$TYPE};
 my $MIME_TYPE = $TYPE_LOOKUP{$TYPE};
 
 
-my $rpi = Device::WebIO::RaspberryPi->new;
+my $rpi = Device::WebIO::RaspberryPi->new({
+    vid_use_audio => 1,
+});
 my $webio = Device::WebIO->new;
 $webio->register( 'rpi', $rpi );
 
@@ -39,6 +41,7 @@ $webio->vid_set_kbps(   'rpi', 0, $BITRATE );
 
 open( my $out, '>', $OUT_FILE ) or die "Can't open '$OUT_FILE': $!\n";
 binmode $out;
+say "Starting video stream . . . ";
 $webio->vid_stream_callback( 'rpi', 0, $MIME_TYPE, sub {
     my ($frame) = @_;
     print $out pack( 'C*', @$frame );
