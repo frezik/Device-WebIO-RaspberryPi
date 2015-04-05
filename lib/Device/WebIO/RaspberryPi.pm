@@ -879,6 +879,14 @@ download and compile this from:
 
 https://github.com/thaytan/gst-rpicamsrc
 
+=head1 VIDEO WITH AUDIO
+
+As of version 0.009, C<Device::WebIO::RaspberryPi> has jumped into the Talkies 
+era of movies by allowing audio input on video streams. You'll need a USB 
+sound device that's compatible with the Raspberry Pi which can also take a 
+microphone input. The attribute C<vid_audio_input_device> can be used to 
+set the ALSA device for recording.
+
 =head1 IMPLEMENTED ROLES
 
 =over 4
@@ -907,6 +915,19 @@ Returns the condvar from C<AnyEvent>, which is used for video processing.  If
 there's any events you would like to handle in between video frames, get this 
 condvar and use it with C<AnyEvent>. You may also use this method as a 
 setter before calling C<vid_stream_begin_loop()>.
+
+=head2 vid_use_audio
+
+When getting the video stream, set this flag to true to get put audio on it.  
+Note that this only applies to outputs that are container formats, like AVI, 
+not raw video outputs, like h.264.
+
+Default if false.
+
+=head2 vid_audio_input_device
+
+If putting an audio stream on the video, this specifies the ALSA device to 
+use for input. Default is 'hw:1,0'.
 
 =head1 LICENSE
 
