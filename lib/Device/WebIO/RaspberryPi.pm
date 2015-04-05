@@ -1,4 +1,4 @@
-# Copyright (c) 2014  Timm Murray
+# Copyright (c) 2015  Timm Murray
 # All rights reserved.
 # 
 # Redistribution and use in source and binary forms, with or without 
@@ -867,10 +867,6 @@ __END__
 
 Access the Raspberry Pi's pins using Device::WebIO.
 
-After registering this with the main Device::WebIO object, you shouldn't need 
-to access anything in the Rpi object.  All access should go through the 
-WebIO object.
-
 =head1 CAMERA PREREQUISITES
 
 If you intended to use the camera-related methods (e.g. C<img_stream()>), 
@@ -931,7 +927,7 @@ use for input. Default is 'hw:1,0'.
 
 =head1 LICENSE
 
-Copyright (c) 2014  Timm Murray
+Copyright (c) 2015  Timm Murray
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification, are 

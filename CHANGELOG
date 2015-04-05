@@ -1,6 +1,6 @@
 Revision history for perl module Device::WebIO::RaspberryPi
 
-0.009 2015-04-??
+0.009 2015-04-05
 
 - I2C methods will cache device
 - I2C methods switched to using HiPi::BCM2835::I2C
