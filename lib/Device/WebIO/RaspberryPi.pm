@@ -29,6 +29,7 @@ use Moo;
 use namespace::clean;
 use HiPi::Wiring qw( :wiring );
 use HiPi::Device::I2C;
+use HiPi::BCM2835::I2C qw( :all );
 use HiPi::Device::SPI qw( :spi );
 use GStreamer1;
 use Glib qw( TRUE FALSE );
@@ -421,36 +422,38 @@ sub i2c_channels { 2 }
 sub i2c_read
 {
     my ($self, $channel, $addr, $register, $len) = @_;
-    my $dev = $self->_get_i2c_device_by_channel( $channel );
-    my $hipi = HiPi::Device::I2C->new(
-        devicename => $dev,
-        address    => $addr,
-    );
-
-    my @data = $hipi->bus_read( $register, $len );
+    my $dev = $self->_get_i2c_device( $channel, $addr );
+    my @data = $dev->bus_read( $register, $len );
     return @data;
 }
 
 sub i2c_write
 {
     my ($self, $channel, $addr, $register, @data) = @_;
-    my $dev = $self->_get_i2c_device_by_channel( $channel );
-    my $hipi = HiPi::Device::I2C->new(
-        devicename => $dev,
-        address    => $addr,
-    );
-
-    $hipi->bus_write( $register, @data );
+    my $dev = $self->_get_i2c_device( $channel, $addr );
+    $dev->bus_write( $register, @data );
     return 1;
 }
 
-sub _get_i2c_device_by_channel
 {
-    my ($self, $channel) = @_;
-    return
-        $channel == 0 ? '/dev/i2c-0' :
-        $channel == 1 ? '/dev/i2c-1' :
-        undef;
+    my @DEVS;
+    sub _get_i2c_device
+    {
+        my ($self, $channel, $addr) = @_;
+        return $DEVS[$channel]{$addr} if exists $DEVS[$channel]{$addr};
+
+        my $peri = 
+            $channel == 1 ? BB_I2C_PERI_1 :
+            $channel == 0 ? BB_I2C_PERI_0 :
+            undef;
+        my $hipi = HiPi::BCM2835::I2C->new(
+            peripheral => $peri,
+            address    => $addr,
+        );
+
+        $DEVS[$channel]{$addr} = $hipi;
+        return $hipi;
+    }
 }
 
 
@@ -489,6 +492,14 @@ has '_vid_stream_callback_types' => (
 has 'cv' => (
     is      => 'rw',
     default => sub { AnyEvent->condvar },
+);
+has 'vid_use_audio' => (
+    is      => 'rw',
+    default => sub { 0 },
+);
+has 'vid_audio_input_device' => (
+    is      => 'rw',
+    default => sub { 'hw:1,0' },
 );
 with 'Device::WebIO::Device::VideoOutputCallback';
 
@@ -577,6 +588,8 @@ sub vid_stream_begin_loop
     my $bitrate  = $self->vid_kbps( $channel );
     my $callback = $self->_vid_stream_callbacks->[$channel];
     my $type     = $self->_vid_stream_callback_types->[$channel];
+    my $use_audio = $self->vid_use_audio;
+    my $audio_dev = $self->vid_audio_input_device;
 
 
     $self->_init_gstreamer;
@@ -589,6 +602,7 @@ sub vid_stream_begin_loop
         capsfilter => 'the_proud_lord_said' );
     my $sink    = GStreamer1::ElementFactory::make(
         fakesink => 'that_i_should_bow_so_low' );
+    my $vid_queue = GStreamer1::ElementFactory::make( 'queue' => 'only_a_cat' );
 
     my $muxer = ($type ne 'video/H264')
         ? $self->_get_vid_mux_by_type( $type )
@@ -610,6 +624,34 @@ sub vid_stream_begin_loop
 
     my @link = ( $rpi, $h264parse, $capsfilter );
     push @link, $muxer if defined $muxer;
+
+    if( defined($muxer) && ($type ne 'video/H264') ) {
+        my $audio_src = GStreamer1::ElementFactory::make(
+            'alsasrc' => 'of_a_different_coat' );
+        my $audio_caps = GStreamer1::ElementFactory::make(
+            capsfilter => 'the_proud_lord_said' );
+        my $mp3enc = GStreamer1::ElementFactory::make(
+            lamemp3enc => 'the_only_truth_i_know' );
+        my $audio_queue = GStreamer1::ElementFactory::make(
+            queue => 'in_a_coat_of_gold' );
+
+        $audio_src->set( 'device' => $audio_dev );
+        $mp3enc->set( 'bitrate' => 256 );
+
+        my $caps = GStreamer1::Caps::Simple->new( 'audio/x-raw',
+            rate     => 'Glib::Int'    => 44100,
+            channels => 'Glib::Int'    => 1,
+            format   => 'Glib::String' => 'S16LE',
+        );
+        $audio_caps->set( caps => $caps );
+
+        $audio_src->link(  $audio_caps );  $pipeline->add( $audio_src );
+        $audio_caps->link( $mp3enc );      $pipeline->add( $audio_caps );
+        $mp3enc->link(     $audio_queue ); $pipeline->add( $mp3enc );
+        $audio_queue->link( $muxer ) if defined $muxer;
+        $pipeline->add( $audio_queue );
+    }
+
     push @link, $sink;
     $pipeline->add( $_ ) for @link;
     foreach my $i (0 .. ($#link - 1)) {
